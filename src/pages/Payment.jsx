@@ -14,11 +14,32 @@ function loadRazorpayScript() {
   });
 }
 
+// ⭐ PICK API ROUTE BASED ON FEATURE
+function getFeatureRoute(feature) {
+  switch (feature) {
+    case "name":
+      return "/api/report/generate";
+
+    case "business":
+      return "/api/lucky/generate";
+
+    case "compatibility":
+      return "/api/compatibility/check";
+
+    case "full":
+      return "/api/report/generate?mode=full";
+
+    default:
+      return "/api/report/generate";
+  }
+}
+
 export default function Payment() {
   const [requestData, setRequestData] = useState(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  // Load stored feature data
   useEffect(() => {
     const raw = sessionStorage.getItem("astravia_active_request");
     if (!raw) {
@@ -33,44 +54,44 @@ export default function Payment() {
 
     const { feature, identifier } = requestData;
 
-    // Extract name & dob normally
-    let name, dob;
+    // PICK CORRECT BACKEND ROUTE
+    const apiRoute = getFeatureRoute(feature);
+
+    // BUILD PAYLOAD FOR FEATURE
+    let payload = {};
     if (feature === "compatibility") {
-      name = requestData.personA?.name;
-      dob = requestData.personA?.dob;
+      payload = {
+        personA: requestData.personA,
+        personB: requestData.personB,
+      };
     } else {
-      name = requestData.name;
-      dob = requestData.dob;
+      payload = {
+        name: requestData.name,
+        dob: requestData.dob,
+      };
     }
 
-    // ⭐ FREE MODE → NO PAYMENT
+    // ⭐ IF PRICE = 0 → FREE MODE
     if (REPORT_PRICE === 0) {
       try {
         setLoading(true);
 
-        const res = await fetch(`${API_BASE}/api/pay/free-generate`, {
+        const res = await fetch(`${API_BASE}${apiRoute}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            identifier,
-            name,
-            dob,
-          }),
+          body: JSON.stringify(payload),
         });
 
         const data = await res.json();
 
-        if (!data.success) {
-          alert(data.error || "Failed to generate free report.");
+        if (!data) {
+          alert("Unexpected server response.");
           return;
         }
 
-        // Save report locally
+        // SAVE REPORT LOCALLY
         localStorage.setItem("astravia_last_identifier", identifier);
-        localStorage.setItem(
-          "astravia_last_report",
-          JSON.stringify(data.report)
-        );
+        localStorage.setItem("astravia_last_report", JSON.stringify(data));
 
         navigate("/report");
         return;
@@ -82,12 +103,13 @@ export default function Payment() {
       }
     }
 
-    // ⭐ PAID MODE → RAZORPAY FLOW
+    // ⭐ PAID MODE (RAZORPAY)
     setLoading(true);
+
     try {
       const ok = await loadRazorpayScript();
       if (!ok) {
-        alert("Unable to load payment gateway. Check your internet.");
+        alert("Unable to load payment gateway. Check internet.");
         setLoading(false);
         return;
       }
@@ -101,21 +123,24 @@ export default function Payment() {
       const orderData = await orderRes.json();
       if (!orderData.success) {
         console.error(orderData);
-        alert("Failed to create order. Please try again.");
+        alert("Failed to create order.");
         setLoading(false);
         return;
       }
 
       const { key, orderId, amount, currency } = orderData;
 
-      const options = {
+      const rzp = new window.Razorpay({
         key,
         amount,
         currency,
         name: "Astravia",
-        description: `Astravia ${feature || "numerology"} report`,
+        description: `Astravia ${feature} report`,
         order_id: orderId,
-        prefill: { name, email: identifier },
+        prefill: {
+          name: payload?.name || payload?.personA?.name,
+          email: identifier,
+        },
         theme: { color: "#6d28d9" },
 
         handler: async function (response) {
@@ -125,8 +150,8 @@ export default function Payment() {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 identifier,
-                name,
-                dob,
+                name: payload.name || payload.personA?.name,
+                dob: payload.dob || payload.personA?.dob,
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature: response.razorpay_signature,
@@ -152,16 +177,15 @@ export default function Payment() {
             navigate("/report");
           } catch (err) {
             console.error(err);
-            alert("Error while verifying payment. Please contact support.");
+            alert("Verification error.");
           }
         },
-      };
+      });
 
-      const rzp = new window.Razorpay(options);
       rzp.open();
     } catch (err) {
       console.error(err);
-      alert("Payment error. Check console for details.");
+      alert("Payment error.");
     } finally {
       setLoading(false);
     }
@@ -195,21 +219,20 @@ export default function Payment() {
           <>
             Click below to instantly generate your{" "}
             <span className="font-medium">{feature}</span> report for{" "}
-            <b>free</b>. A detailed report will be shown on the next screen and
-            also sent to{" "}
-            <span className="font-medium">{identifier}</span>.
+            <b>free</b>. It will be shown next and emailed to{" "}
+            <b>{identifier}</b>.
           </>
         ) : (
           <>
             Complete your payment to generate your{" "}
-            <span className="font-medium">{feature}</span> numerology report. A
-            detailed report will be shown on the next screen and sent to{" "}
-            <span className="font-medium">{identifier}</span>.
+            <span className="font-medium">{feature}</span> report. It will be
+            shown after payment and emailed to <b>{identifier}</b>.
           </>
         )}
       </p>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
+
         <div className="flex items-center justify-between text-sm">
           <span className="text-gray-600">Report price</span>
           <span className="font-semibold text-gray-900">
