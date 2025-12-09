@@ -1,10 +1,35 @@
+import { Link } from "react-router-dom";
+
 export default function Footer() {
   return (
-    <footer className="border-t bg-white/70 backdrop-blur mt-10">
-      <div className="max-w-5xl mx-auto px-4 py-4 text-xs text-gray-500 flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
-        <span>© {new Date().getFullYear()} Astravia · All rights reserved.</span>
-        <span>Reports are for guidance & entertainment purposes only.</span>
+    <footer className="mt-10 border-t py-6 text-center text-gray-600 text-sm">
+      <div className="flex flex-col sm:flex-row justify-center gap-4">
+
+        <Link to="/shipping-policy" className="hover:text-purple-600">
+          Shipping Policy
+        </Link>
+
+        <Link to="/privacy" className="hover:text-purple-600">
+          Privacy
+        </Link>
+
+        <Link to="/contact" className="hover:text-purple-600">
+          Contact Us
+        </Link>
+
+        <Link to="/refund-policy" className="hover:text-purple-600">
+          Cancellation & Refunds
+        </Link>
+
+        <Link to="/terms" className="hover:text-purple-600">
+          Terms & Conditions
+        </Link>
+
       </div>
+
+      <p className="mt-4 text-xs text-gray-400">
+        © {new Date().getFullYear()} Astravia. All rights reserved.
+      </p>
     </footer>
   );
 }

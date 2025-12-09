@@ -16,6 +16,11 @@ export default function App() {
           <Route path="/feature/:slug" element={<FeatureForm />} />
           <Route path="/payment" element={<Payment />} />
           <Route path="/report" element={<Report />} />
+          <Route path="/shipping-policy" element={<ShippingPolicy />} />
+  <Route path="/privacy" element={<Privacy />} />
+  <Route path="/contact" element={<ContactUs />} />
+  <Route path="/refund-policy" element={<CancellationRefund />} />
+  <Route path="/terms" element={<Terms />} />
         </Routes>
       </div>
       <Footer />
