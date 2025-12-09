@@ -1,7 +1,7 @@
 export const API_BASE =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
-export const REPORT_PRICE = 29; // ₹99 mass market
+export const REPORT_PRICE = 1; // ₹99 mass market
 
 export const LEGAL_DISCLAIMER =
   "Astravia provides numerology-based insights for guidance and entertainment purposes only. " +
