@@ -5,7 +5,7 @@ export default function ContactUs() {
       <p className="text-sm leading-relaxed mb-2">
         For support or queries, email us at:
       </p>
-      <p className="font-medium text-purple-600 text-sm">support@astravia.com</p>
+      <p className="font-medium text-purple-600 text-sm">astravia177@gmail.com</p>
     </div>
   );
 }
