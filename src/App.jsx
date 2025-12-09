@@ -5,6 +5,12 @@ import FeatureForm from "./pages/FeatureForm";
 import Payment from "./pages/Payment";
 import Report from "./pages/Report";
 import { Routes, Route } from "react-router-dom";
+import ShippingPolicy from "./pages/ShippingPolicy";
+import Privacy from "./pages/Privacy";
+import ContactUs from "./pages/ContactUs";
+import CancellationRefund from "./pages/CancellationRefund";
+import Terms from "./pages/Terms";
+
 
 export default function App() {
   return (
