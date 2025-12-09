@@ -210,6 +210,11 @@ export default function Payment() {
       </p>
 
       <div className="bg-white border rounded-xl p-5 shadow-sm">
+        <div className="flex items-center justify-between text-sm mb-3">
+  <span className="text-gray-600">Report price</span>
+  <span className="font-semibold text-gray-900">₹{REPORT_PRICE}.00</span>
+</div>
+
         <button
           onClick={handlePay}
           disabled={loading}
