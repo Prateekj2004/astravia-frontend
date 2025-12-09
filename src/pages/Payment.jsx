@@ -14,13 +14,13 @@ function loadRazorpayScript() {
   });
 }
 
-// ⭐ PICK API ROUTE BASED ON FEATURE
+// ⭐ Correct backend routes for each feature
 function getFeatureRoute(feature) {
   switch (feature) {
     case "name":
       return "/api/report/generate";
 
-    case "business":
+    case "lucky":
       return "/api/lucky/generate";
 
     case "compatibility":
@@ -39,7 +39,6 @@ export default function Payment() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Load stored feature data
   useEffect(() => {
     const raw = sessionStorage.getItem("astravia_active_request");
     if (!raw) {
@@ -54,24 +53,29 @@ export default function Payment() {
 
     const { feature, identifier } = requestData;
 
-    // PICK CORRECT BACKEND ROUTE
+    // ⭐ PICK BACKEND ROUTE
     const apiRoute = getFeatureRoute(feature);
 
-    // BUILD PAYLOAD FOR FEATURE
-    let payload = {};
+    // ⭐ Normalize name & dob for backend verify
+    let name, dob;
+
     if (feature === "compatibility") {
-      payload = {
-        personA: requestData.personA,
-        personB: requestData.personB,
-      };
+      name = requestData.personA?.name;
+      dob = requestData.personA?.dob;
     } else {
-      payload = {
-        name: requestData.name,
-        dob: requestData.dob,
-      };
+      name = requestData.name;
+      dob = requestData.dob;
     }
 
-    // ⭐ IF PRICE = 0 → FREE MODE
+    // ⭐ BUILD PAYLOAD FOR FREE MODE
+    let payload =
+      feature === "compatibility"
+        ? { personA: requestData.personA, personB: requestData.personB }
+        : { name, dob };
+
+    // --------------------------------------------
+    // ⭐ FREE MODE (REPORT_PRICE = 0)
+    // --------------------------------------------
     if (REPORT_PRICE === 0) {
       try {
         setLoading(true);
@@ -89,7 +93,7 @@ export default function Payment() {
           return;
         }
 
-        // SAVE REPORT LOCALLY
+        // Save report
         localStorage.setItem("astravia_last_identifier", identifier);
         localStorage.setItem("astravia_last_report", JSON.stringify(data));
 
@@ -97,19 +101,21 @@ export default function Payment() {
         return;
       } catch (err) {
         console.error(err);
-        alert("Free report error. Try again.");
+        alert("Free report error.");
       } finally {
         setLoading(false);
       }
     }
 
-    // ⭐ PAID MODE (RAZORPAY)
+    // --------------------------------------------
+    // ⭐ PAID MODE — RAZORPAY
+    // --------------------------------------------
     setLoading(true);
 
     try {
       const ok = await loadRazorpayScript();
       if (!ok) {
-        alert("Unable to load payment gateway. Check internet.");
+        alert("Payment library failed to load.");
         setLoading(false);
         return;
       }
@@ -122,56 +128,49 @@ export default function Payment() {
 
       const orderData = await orderRes.json();
       if (!orderData.success) {
-        console.error(orderData);
-        alert("Failed to create order.");
+        alert("Order creation failed.");
         setLoading(false);
         return;
       }
 
-      const { key, orderId, amount, currency } = orderData;
-
       const rzp = new window.Razorpay({
-        key,
-        amount,
-        currency,
+        key: orderData.key,
+        amount: orderData.amount,
+        currency: orderData.currency,
         name: "Astravia",
         description: `Astravia ${feature} report`,
-        order_id: orderId,
-        prefill: {
-          name: payload?.name || payload?.personA?.name,
-          email: identifier,
-        },
+        order_id: orderData.orderId,
+        prefill: { name, email: identifier },
         theme: { color: "#6d28d9" },
 
+        // 🎯 Payment successful → verify → save → redirect
         handler: async function (response) {
           try {
-            const verifyRes = await fetch(`${API_BASE}/api/pay/verify`, {
+            const vRes = await fetch(`${API_BASE}/api/pay/verify`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 identifier,
-                name: payload.name || payload.personA?.name,
-                dob: payload.dob || payload.personA?.dob,
+                name,
+                dob,
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature: response.razorpay_signature,
               }),
             });
 
-            const verifyData = await verifyRes.json();
-            if (!verifyData.success) {
-              console.error(verifyData);
-              alert("Payment verified but report generation failed.");
+            const vData = await vRes.json();
+
+            if (!vData.success) {
+              alert("Payment verified but report failed.");
               return;
             }
 
-            localStorage.setItem(
-              "astravia_last_identifier",
-              identifier
-            );
+            // Save report
+            localStorage.setItem("astravia_last_identifier", identifier);
             localStorage.setItem(
               "astravia_last_report",
-              JSON.stringify(verifyData.report)
+              JSON.stringify(vData.report)
             );
 
             navigate("/report");
@@ -191,83 +190,37 @@ export default function Payment() {
     }
   };
 
-  if (!requestData) {
-    return (
-      <div className="max-w-3xl mx-auto px-4 py-10 text-sm text-gray-600">
-        Loading...
-      </div>
-    );
-  }
+  if (!requestData)
+    return <div className="p-10 text-center">Loading…</div>;
 
   const { feature, identifier } = requestData;
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
-      <button
-        onClick={() => navigate(-1)}
-        className="text-xs text-gray-500 hover:text-gray-800 mb-4"
-      >
+      <button onClick={() => navigate(-1)} className="text-xs text-gray-500">
         ← Back
       </button>
 
-      <h1 className="text-2xl font-semibold text-gray-900 mb-1">
+      <h1 className="text-2xl font-semibold text-gray-900 mb-2">
         {REPORT_PRICE === 0 ? "Generate your free report" : "Secure payment"}
       </h1>
 
       <p className="text-sm text-gray-600 mb-6">
-        {REPORT_PRICE === 0 ? (
-          <>
-            Click below to instantly generate your{" "}
-            <span className="font-medium">{feature}</span> report for{" "}
-            <b>free</b>. It will be shown next and emailed to{" "}
-            <b>{identifier}</b>.
-          </>
-        ) : (
-          <>
-            Complete your payment to generate your{" "}
-            <span className="font-medium">{feature}</span> report. It will be
-            shown after payment and emailed to <b>{identifier}</b>.
-          </>
-        )}
+        Your <b>{feature}</b> report will be sent to <b>{identifier}</b>.
       </p>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
-
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-600">Report price</span>
-          <span className="font-semibold text-gray-900">
-            ₹{REPORT_PRICE}.00
-          </span>
-        </div>
-
-        <div className="flex items-center justify-between text-xs text-gray-500">
-          <span>Taxes & fees</span>
-          <span>Included</span>
-        </div>
-
-        <div className="border-t pt-3 flex items-center justify-between text-sm">
-          <span className="font-medium text-gray-800">Total</span>
-          <span className="text-lg font-semibold text-purple-600">
-            ₹{REPORT_PRICE}.00
-          </span>
-        </div>
-
+      <div className="bg-white border rounded-xl p-5 shadow-sm">
         <button
           onClick={handlePay}
           disabled={loading}
-          className="mt-2 w-full inline-flex items-center justify-center rounded-xl bg-purple-600 text-white text-sm font-medium px-5 py-2.5 hover:bg-purple-700 transition shadow-sm disabled:opacity-60"
+          className="w-full bg-purple-600 text-white py-2.5 rounded-xl"
         >
           {loading
             ? "Processing..."
             : REPORT_PRICE === 0
             ? "Generate my free report"
-            : "Pay & generate my report"}
+            : "Pay & generate report"}
         </button>
-
-        <p className="mt-3 text-[11px] text-gray-500 leading-relaxed">
-          <strong className="font-semibold">Disclaimer:</strong>{" "}
-          {LEGAL_DISCLAIMER}
-        </p>
       </div>
     </div>
   );
